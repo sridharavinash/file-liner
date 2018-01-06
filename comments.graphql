@@ -1,0 +1,22 @@
+query($owner: String!, $repo: String!, $pr_id: Int!){
+  repository(owner: $owner, name: $repo) {
+    pullRequest(number: $pr_id) {
+      reviews(first: 10) {
+        nodes {
+          comments(first: 10) {
+            nodes {
+              author {
+                login
+              }
+              originalPosition
+              position
+              bodyText
+              path
+              diffHunk
+            }
+          }
+        }
+      }
+    }
+  }
+}
