@@ -8,8 +8,6 @@ query($owner: String!, $repo: String!, $pr_id: Int!){
               author {
                 login
               }
-              originalPosition
-              position
               bodyText
               path
               diffHunk
