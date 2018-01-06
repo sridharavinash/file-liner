@@ -14,9 +14,7 @@ client = Client(
                                         'Authorization': 'bearer ' + GITHUB_TOKEN,
                                     },
                                     use_json=True),
-    
 )
 query = gql(DATA)
-resultqueryg = client.execute(query)
+result = client.execute(query)
 print(result)
-
