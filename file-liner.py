@@ -8,52 +8,79 @@ import argparse
 from gql import gql, Client
 from gql.transport.requests import RequestsHTTPTransport
 
-parser = argparse.ArgumentParser(description='Get comments for a file in pull request.')
-parser.add_argument("url", help="The full url of the repo containing the pull request e.g https://github.com/<owner>/<repo>/pull/<pr_id>")
+class FileLiner(object):
+    def __init__(self, url, token, data):
+        self.url = url
+        self.token = token
+        self.diff_re = re.compile("@@ -(\d+).*@@")
+        self.data = data
+        self.query = None
+        self.variables = None
 
-args =  parser.parse_args()
+    def client(self):
+        client = Client(
+            transport=RequestsHTTPTransport(url=self.url,
+                                            headers={'Authorization': 'bearer ' + self.token},
+                                            use_json=True)
+        )
+        return client
 
-parts = args.url.split("/")
+    def build_query(self, args):
+        parts = args.url.split("/")
+        owner = parts[-4]
+        repo = parts[-3]
+        prId = int(parts[-1])
 
-owner = parts[-4]
-repo = parts[-3]
-prId = int(parts[-1])
+        self.query = gql(self.data)
+        self.variables={"owner": owner, "repo": repo, "pr_id": prId}
 
-GITHUB_URL="https://api.github.com/graphql"
-GITHUB_TOKEN=os.getenv('GITHUB_TOKEN')
-DATA= open("./comments.graphql").read()
+    def get_comments(self):
+        result = self.client().execute(self.query, self.variables)
+        results = {}
+        for r in result['repository']['pullRequest']['reviews']['nodes']:
+            for n in r['comments']['nodes']:
+                filename = n['path']
+                author = n['author']['login']
+                comment = n['bodyText']
+                line = self.get_line_for_comment(n['diffHunk'])
+                key = filename+':'+str(line)
+                if key not in results:
+                    results[key] = [{'author': author, 'comment': comment}]
+                else:
+                    results[key].append({'author': author, 'comment': comment})
+        return results
 
-# get the first value of the diff hunk line number
-diff_re = re.compile("@@ -(\d+).*@@")
+    def get_line_for_comment(self, diff_hunk):
+        ''' Get the start of the line of the comment from the diffHunk'''
+        found_start =  self.diff_re.search(diff_hunk)
+        if found_start == None:
+            return 0
+        pos = int(found_start[1])
+        for i in diff_hunk.split('\n')[1:]:
+            if i[0] != '-':
+                pos +=1
+        return pos
 
-def calc_start_line(diff_hunk):
-    ''' Get the start of the line of the comment from the diffHunk'''
-    global diff_re
-    found_start =  diff_re.search(diff_hunk)
-    if found_start == None:
-        return 0
-    pos = int(found_start[1])
-    for i in diff_hunk.split('\n')[1:]:
-        if i[0] != '-':
-            pos +=1
-    return pos
+def main():
+    parser = argparse.ArgumentParser(description='Get comments for a file in pull request.')
+    parser.add_argument("url", help="The full url of the repo containing the pull request e.g https://github.com/<owner>/<repo>/pull/<pr_id>")
 
-client = Client(
-    transport=RequestsHTTPTransport(url=GITHUB_URL,
-                                    headers={
-                                        'Authorization': 'bearer ' + GITHUB_TOKEN,
-                                    },
-                                    use_json=True),
-)
-query = gql(DATA)
-variables={"owner": owner, "repo": repo, "pr_id": prId}
+    args =  parser.parse_args()
+
+    github_gql_url="https://api.github.com/graphql"
+    github_token=os.getenv('GITHUB_TOKEN')
+    if github_token == None:
+        print("Error: No GITHUB_TOKEN environment variable set. ")
+        exit(1)
+
+    data= open("./comments.graphql").read()
+    fl = FileLiner(url=github_gql_url,token=github_token, data=data)
+    fl.build_query(args)
+    print(fl.get_comments())
+
+if __name__ == '__main__':
+    main()
 
 
-result = client.execute(query, variables)
 
-for r in result['repository']['pullRequest']['reviews']['nodes']:
-    for n in r['comments']['nodes']:
-        print(n['author']['login'])
-        print(n['path'])
-        print(n['bodyText'])
-        print(calc_start_line(n['diffHunk']))
+
