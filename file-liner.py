@@ -9,8 +9,8 @@ from gql import gql, Client
 from gql.transport.requests import RequestsHTTPTransport
 
 class FileLiner(object):
-    def __init__(self, url, token, data):
-        self.url = url
+    def __init__(self, gql_url, token, data):
+        self.graphql_url = gql_url
         self.token = token
         self.diff_re = re.compile("@@ -(\d+).*@@")
         self.data = data
@@ -19,7 +19,7 @@ class FileLiner(object):
 
     def client(self):
         client = Client(
-            transport=RequestsHTTPTransport(url=self.url,
+            transport=RequestsHTTPTransport(url=self.graphql_url,
                                             headers={'Authorization': 'bearer ' + self.token},
                                             use_json=True)
         )
@@ -78,7 +78,7 @@ def main():
         exit(1)
 
     data= open("./comments.graphql").read()
-    fl = FileLiner(url=github_gql_url,token=github_token, data=data)
+    fl = FileLiner(gql_url=github_gql_url,token=github_token, data=data)
     if not fl.build_query(args):
         print("PR url is malformed, expecting <owner>/<repo>/pull/<pr_id>")
         exit(1)
