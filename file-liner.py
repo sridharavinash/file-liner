@@ -27,12 +27,16 @@ class FileLiner(object):
 
     def build_query(self, args):
         parts = args.url.split("/")
-        owner = parts[-4]
-        repo = parts[-3]
-        prId = int(parts[-1])
+        try:
+            owner = parts[-4]
+            repo = parts[-3]
+            prId = int(parts[-1])
+        except IndexError:
+            return False
 
         self.query = gql(self.data)
         self.variables={"owner": owner, "repo": repo, "pr_id": prId}
+        return True
 
     def get_comments(self):
         result = self.client().execute(self.query, self.variables)
@@ -75,7 +79,10 @@ def main():
 
     data= open("./comments.graphql").read()
     fl = FileLiner(url=github_gql_url,token=github_token, data=data)
-    fl.build_query(args)
+    if not fl.build_query(args):
+        print("PR url is malformed, expecting <owner>/<repo>/pull/<pr_id>")
+        exit(1)
+
     print(fl.get_comments())
 
 if __name__ == '__main__':
