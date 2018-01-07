@@ -39,7 +39,12 @@ class FileLiner(object):
         return True
 
     def get_comments(self):
-        result = self.client().execute(self.query, self.variables)
+        try:
+            result = self.client().execute(self.query, self.variables)
+        except Exception as e:
+            print("Error:",e)
+            return {}
+
         results = {}
         for r in result['repository']['pullRequest']['reviews']['nodes']:
             for n in r['comments']['nodes']:
@@ -55,7 +60,7 @@ class FileLiner(object):
         return results
 
     def get_line_for_comment(self, diff_hunk):
-        ''' Get the start of the line of the comment from the diffHunk'''
+        '''Get the start of the line of the comment from the diffHunk'''
         found_start =  self.diff_re.search(diff_hunk)
         if found_start == None:
             return 0
